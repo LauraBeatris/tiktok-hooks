@@ -2,7 +2,7 @@ import { autumn, getCustomerId, HOOKS_FEATURE_ID } from "@/lib/autumn";
 import { ratelimit } from "@/lib/rate-limit";
 import { streamHooks } from "@/lib/stream-hooks";
 import { createTextStreamResponse, toTextStream } from "ai";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 
 const bodySchema = z.object({
@@ -41,16 +41,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "limit_reached" }, { status: 402 });
   }
 
-  const result = await streamHooks({
+  const result = streamHooks({
     topic: body.data.topic,
-    onComplete: async () => {
-      await autumn.track({
-        customerId,
-        featureId: HOOKS_FEATURE_ID,
-        value: 1,
-      });
-    },
+    abortSignal: request.signal,
   });
+
+  after(async () => {
+    try {
+      await result.output;
+    } catch {
+      return;
+    }
+
+    await autumn.track({
+      customerId,
+      featureId: HOOKS_FEATURE_ID,
+      value: 1,
+    });
+  });
+
   return createTextStreamResponse({
     stream: toTextStream({ stream: result.stream }),
   });
