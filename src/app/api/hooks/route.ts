@@ -1,5 +1,5 @@
 import { autumn, getCustomerId, HOOKS_FEATURE_ID } from "@/lib/autumn";
-import { ratelimit } from "@/lib/rate-limit";
+import { isRateLimited } from "@/lib/rate-limit";
 import { streamHooks } from "@/lib/stream-hooks";
 import { createTextStreamResponse, toTextStream } from "ai";
 import { after, NextResponse } from "next/server";
@@ -16,20 +16,13 @@ function getClientIp(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { success } = await ratelimit.limit(getClientIp(request));
-  if (!success) {
-    return NextResponse.json(
-      { error: "Too many requests, try again in a minute." },
-      { status: 429 },
-    );
+  if (await isRateLimited(getClientIp(request))) {
+    return NextResponse.json({ error: "rate_limited" }, { status: 429 });
   }
 
   const body = bodySchema.safeParse(await request.json().catch(() => null));
   if (!body.success) {
-    return NextResponse.json(
-      { error: "Add a topic (up to 200 characters)" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "invalid_topic" }, { status: 400 });
   }
 
   const customerId = await getCustomerId();

@@ -1,10 +1,6 @@
 import { openai } from "@ai-sdk/openai";
 import { Output, streamText } from "ai";
-import { z } from "zod";
-
-export const hooksSchema = z.object({
-  hooks: z.array(z.string()).length(5),
-});
+import { hooksSchema } from "./hooks-schema";
 
 export function streamHooks({
   topic,

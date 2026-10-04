@@ -1,100 +1,29 @@
-"use client";
+import { HookGenerator } from "@/components/hook-generator";
 
-import { hooksSchema } from "@/lib/stream-hooks";
-import { useObject } from "@ai-sdk/react";
-
-export default function Home() {
-  const [topic, setTopic] = useState("");
-  const { object, submit, isLoading, error, stop } = useObject({
-    api: "/api/hooks",
-    schema: hooksSchema,
-  });
-
-  const errorCode = getErrorCode(error);
-  const limitReached = errorCode === "limit_reached";
-
-  async function upgrade() {
-    const response = await fetch("/api/upgrade", { method: "POST " });
-    const { url } = await response.json();
-    window.location.href = url;
-  }
+export default async function Home({ searchParams }: PageProps<"/">) {
+  const { upgraded } = await searchParams;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 px-4 py-16">
-      <h1 className="text-3xl font-bold">TikTok hook generator</h1>
+    <>
+      <div className="backdrop-glow" aria-hidden />
+      <main className="relative mx-auto flex w-full max-w-xl flex-1 flex-col px-4 pt-20 pb-16 sm:pt-28">
+        <header className="mb-10 flex flex-col items-center text-center">
+          <span className="mb-5 inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted">
+            <span className="size-1.5 rounded-full bg-pink" />
+            {upgraded ? "You're on Pro. Unlimited hooks." : "3 free hooks a day"}
+          </span>
+          <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+            Stop the scroll
+            <span className="text-pink">.</span>
+          </h1>
+          <p className="mt-3 max-w-sm text-[15px] text-muted text-balance">
+            Five opening lines for your next TikTok, written for the first two
+            seconds.
+          </p>
+        </header>
 
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          submit({ topic });
-        }}
-        className="flex gap-2"
-      >
-        <input
-          value={topic}
-          onChange={(event) => setTopic(event.target.value)}
-          placeholder="e.g. meal prep for lazy people"
-          className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
-        />
-        {isLoading ? (
-          <button
-            type="button"
-            onClick={stop}
-            className="rounded-lg border border-zinc-300 px-4 py-2 dark:border-zinc-700"
-          >
-            Stop
-          </button>
-        ) : (
-          <button className="rounded-lg bg-black px-4 py-2 text-white dark:bg-white dark:text-black">
-            Generate
-          </button>
-        )}
-      </form>
-
-      {limitReached && (
-        <div className="rounded-lg border border-amber-400 bg-amber-50 p-4 text-amber-900 dark:bg-amber-950 dark:text-amber-100">
-          <p className="mb-3">You&apos;ve used your free hooks for today.</p>
-          <button
-            onClick={upgrade}
-            className="rounded-lg bg-amber-500 px-4 py-2 font-medium text-black"
-          >
-            Upgrade to Pro
-          </button>
-        </div>
-      )}
-
-      {error && !limitReached && (
-        <p className="text-red-600">
-          {(errorCode && ERROR_MESSAGES[errorCode]) ?? "Something went wrong."}
-        </p>
-      )}
-
-      <ol className="flex flex-col gap-3">
-        {object?.hooks?.map((hook, index) => (
-          <li
-            key={index}
-            className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800"
-          >
-            {hook}
-          </li>
-        ))}
-      </ol>
-    </main>
+        <HookGenerator />
+      </main>
+    </>
   );
-}
-
-const ERROR_MESSAGES: Record<string, string> = {
-  rate_limited: "Too many requests, try again in a minute.",
-  invalid_topic: "Add a topic (up to 200 characters).",
-};
-
-function getErrorCode(error: Error | undefined) {
-  if (!error) {
-    return null;
-  }
-  try {
-    return (JSON.parse(error.message) as { error?: string }).error ?? null;
-  } catch {
-    return null;
-  }
 }
