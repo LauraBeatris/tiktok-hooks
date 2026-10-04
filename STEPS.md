@@ -55,15 +55,37 @@ Hint: in a route handler, `cookies()` from `next/headers` can read and set cooki
 
 ## Step 4 — Generate hooks (no Autumn yet)
 
-Build `POST /api/hooks` that takes `{ topic }` and returns 5 hooks from OpenAI.
+Build `POST /api/hooks` in `src/app/api/hooks/route.ts` that takes `{ topic }` and returns 5 hooks.
 Then build a page with an input, a button and a list.
 
-📖 [OpenAI quickstart → Install the OpenAI SDK and run an API call](https://developers.openai.com/api/docs/quickstart)
+Use zod twice:
+- **Request body**: parse `{ topic }` with a schema (non-empty, max ~200 chars) and return `400` when it fails. Use `safeParse` so you get a result instead of a thrown error.
+- **Model output**: describe the answer as `z.object({ hooks: z.array(z.string()).length(5) })` and let the AI SDK enforce it. No more splitting text by newlines.
 
-Use the Responses API (`client.responses.create`, with `instructions` and `input`) and read `response.output_text`.
-Model: `gpt-6-luna`, OpenAI's cheapest current model.
+📖 [Next.js → Route Handlers](https://nextjs.org/docs/app/getting-started/route-handlers): the file must be named `route.ts`
+📖 [AI SDK → Generating Structured Data → Generating Structured Outputs](https://ai-sdk.dev/docs/ai-sdk-core/generating-structured-data#generating-structured-outputs): `generateText` with `output: Output.object({ schema })`
+📖 [AI SDK → OpenAI provider](https://ai-sdk.dev/providers/ai-sdk-providers/openai): `import { openai } from "@ai-sdk/openai"`, then `model: openai("gpt-6-luna")`
+📖 [Zod → Basic usage](https://zod.dev/basics): `safeParse`
 
-**You're done when** you can type a topic and see 5 hooks, as many times as you want.
+Model: `gpt-6-luna`, OpenAI's cheapest current model. The provider reads `OPENAI_API_KEY` from env.
+
+**You're done when** you can type a topic and see 5 hooks, as many times as you want, and an empty topic gets a 400.
+
+## Step 4.5 — Rate limit by IP
+
+Autumn's daily limit follows the **cookie**. Clear cookies or open an incognito window and you're a new customer with 3 fresh hooks. A rate limit keyed on the **IP address** closes that gap and stops someone from spamming your OpenAI bill.
+
+Create a free Redis database on Upstash and add `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` to `.env.local`.
+Allow something like 5 requests per minute per IP. Run it **first** in the route, before Autumn and before OpenAI, and return `429` when it fails.
+
+📖 [Upstash Ratelimit → Getting started](https://upstash.com/docs/redis/sdks/ratelimit-ts/gettingstarted): `Ratelimit.slidingWindow` and `ratelimit.limit(identifier)`
+📖 [Vercel → Request headers → x-forwarded-for](https://vercel.com/docs/headers/request-headers#x-forwarded-for): where the client IP comes from
+
+Think about it: Autumn's limit and this one answer different questions. Autumn asks "what did they pay for?" The rate limit asks "is this abuse?" Which one should send the user to the upgrade box?
+
+**You're done when** clicking Generate 6 times in a minute gets a 429 on the 6th.
+
+Order of checks in the route after step 6: **rate limit → validate body → customer → `check` → generate → `track`**. Cheapest and most likely to reject goes first.
 
 ## Step 5 — Gate it with `check`
 
